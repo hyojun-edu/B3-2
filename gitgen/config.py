@@ -11,7 +11,7 @@ DEFAULT_CONVENTION_FILE = ".ai-gitgen.yml"
 DEFAULT_CONVENTION = {
     "language": "영어",
     "commit": {"prefixes": ["feat", "fix", "docs", "refactor", "test", "chore"], "scope": True, "max_title_length": 72, "body_bullets": 3},
-    "pr": {"tone": "간결하고 사실 중심", "title_prefix": False, "sections": ["Why", "What"]},
+    "pr": {"tone": "간결하고 사실 중심", "title_prefix": False, "sections": ["Why", "What", "How to Test"]},
     "safe_mode": {"max_files": 10, "max_lines": 200, "mask_patterns": []},
 }
 
