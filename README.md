@@ -275,3 +275,83 @@ Title: Docs: 정규식 마스킹 및 PR 정규화 로직 주석 추가
   1. "README.md의 예시 커밋 메시지와 출력 줄 수를 현재 변경 내용에 맞게 수정했습니다." 라는 내용이 있었는데, 실제 수정은 main.py에만 있었고 README는 수정사항이 없었음. 환각에 의한 내용이므로 삭제.
   2. 마찬가지로 "-EADME 예시의 출력 내용을 현재 동작에 맞게 갱신하기 위해서입니다." 부분도 README 에서의 출력 내용에 대해서 갱신된 변경사항이 전혀 없었으므로 삭제.
   3. "동적 마스킹 정규식을 사전 컴파일해 문법 오류를 조기에 확인하는 흐름을 주석으로 명시했습니다."은 이번 변경사항이 정규식이 어떤 동작을 하는지를 설명하는 주석을 다는 것이기에 의도에서 벗어난 설명이므로 삭제.
+
+
+### 2. 커밋/PR 템플릿 커스터마이징
+- 컨벤션 문서 예시
+```
+# E1-2에서 확인한 팀 커밋 스타일을 재현하는 예시 설정입니다.
+language: 한국어
+commit:
+  prefixes: [Feat, Fix, Docs, Refactor, Test, Chore]
+  scope: false
+  max_title_length: 72
+  body_bullets: 3
+pr:
+  tone: 간결하고 사실 중심
+  title_prefix: true
+  sections:
+    - Why
+    - What
+    - How to Test
+    - Checklist
+```
+- 컨벤션 적용 전/후 생성 결과 비교
+ 1. 컨벤션 적용 전
+```
+% python3 main.py pr 
+[INFO] Git status 수집 완료: 3개 항목
+D .ai-gitgen.yml
+ M README.md
+?? .ai-gitgen_custom.yml
+[INFO] Git diff 수집 완료: 102줄
+[INFO] AI API 요청 중... (1회)
+[DONE] 생성 완료
+
+--- PR Draft ---
+Title: Update README with custom commit and PR template example
+
+## Why
+- Document the custom commit and PR convention example in the repository.
+- Keep the README aligned with the new `.ai-gitgen_custom.yml` configuration.
+
+## What
+- Added a new `.ai-gitgen_custom.yml` file with the team-style commit and PR settings.
+- Updated `README.md` to include the customization example and the before/after generation output.
+- Removed the old `.ai-gitgen.yml` example file.
+----------------------
+```
+ 2. 컨벤션 적용 후
+```
+% python3 main.py pr --convention .ai-gitgen_custom.yml 
+[INFO] Git status 수집 완료: 3개 항목
+D .ai-gitgen.yml
+ M README.md
+?? .ai-gitgen_custom.yml
+[INFO] Git diff 수집 완료: 122줄
+[INFO] AI API 요청 중... (1회)
+[DONE] 생성 완료
+
+--- PR Draft ---
+Title: Docs: 커밋·PR 템플릿 예시와 설정 파일 정리
+
+## Why
+- 커밋/PR 작성 규칙 예시를 별도 설정 파일로 분리해 재사용성을 높이기 위함입니다.
+- README의 예시와 실제 설정 파일 구성을 현재 변경 내용에 맞게 정리하기 위함입니다.
+
+## What
+- 기존 `.ai-gitgen.yml` 예시 파일을 삭제했습니다.
+- 동일한 커밋/PR 컨벤션 예시를 담은 `.ai-gitgen_custom.yml`을 추가했습니다.
+- README에 커밋/PR 템플릿 커스터마이징 예시와 적용 전/후 생성 결과를 추가했습니다.
+
+## How to Test
+- `git status`로 삭제된 파일과 신규 파일, README 변경을 확인합니다.
+- `git diff -- README.md .ai-gitgen_custom.yml`로 변경 내용을 검토합니다.
+- `python3 main.py pr --convention ./.ai-gitgen.yml`로 문서 예시와 생성 결과를 확인합니다.
+
+## Checklist
+- [x] 설정 파일 변경 사항을 문서에 반영했습니다.
+- [x] README 예시는 실제 변경 내용과 일치합니다.
+- [x] PR 제목 형식을 지정된 접두사 규칙에 맞췄습니다.
+----------------------
+```
