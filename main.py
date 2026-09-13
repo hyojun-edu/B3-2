@@ -164,9 +164,22 @@ def git_context(safe_mode: bool, safe_config: Optional[dict] = None) -> tuple[st
 
 def mask_secrets(text: str, extra_patterns: Optional[list] = None) -> str:
     patterns = [
+        # (?i)는 대소문자를 구분하지 않게 하며, `authorization:` 뒤의 공백과
+        # `bearer` 인증 방식을 `( ... )` 그룹으로 보존한다. 그 뒤의 `[^\s]+`는
+        # 공백이 나올 때까지의 토큰값을 선택하므로, 전체 인증값을 마스킹한다.
         (r"(?i)(authorization:\s*bearer\s+)[^\s]+", r"\1[REDACTED]"),
+        # API 키 표기를 대소문자 구분 없이 찾는다. `api[_-]?key`는 `apikey`,
+        # `api_key`, `api-key`를 모두 허용하고, `\s*[=:]\s*`는 `=` 또는 `:`
+        # 앞뒤 공백을 허용한다. 이후 `[^\s,;]+`가 공백·쉼표·세미콜론 전까지의
+        # 실제 키 값을 골라 앞부분 그룹(`\1`)은 남긴 채 치환한다.
         (r"(?i)(api[_-]?key\s*[=:]\s*)[^\s,;]+", r"\1[REDACTED]"),
+        # `secret`, `token`, `password`, `passwd` 중 하나를 찾고, 뒤의 `\s*[=:]\s*`
+        # 로 키-값 구분자와 공백을 허용한다. 값은 공백·쉼표·세미콜론이 나오기
+        # 전까지 매칭된다. 이름과 구분자까지를 그룹으로 보존하고 값만 대체한다.
         (r"(?i)(secret|token|password|passwd)\s*[=:]\s*[^\s,;]+", r"\1=[REDACTED]"),
+        # 이메일의 로컬 파트(`[\w.+-]+`)와 `@` 뒤의 호스트를 찾는다.
+        # 호스트는 `\w` 또는 하이픈으로 된 라벨 하나 이상과 점으로 구분된
+        # 도메인 라벨을 요구하므로, `user@example.com` 같은 주소 전체가 선택된다.
         (r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[REDACTED_EMAIL]"),
     ]
     for item in extra_patterns or []:
@@ -239,6 +252,10 @@ def call_api(prompt: str, args: argparse.Namespace) -> str:
 
 
 def clean_text(text: str) -> str:
+    # 문자열 처음의 Markdown 코드 펜스(`````, 선택적인 `text`/`markdown`, 공백)나
+    # 문자열 끝의 닫는 펜스(````)를 제거한다. `|`는 두 경우 중 하나를 뜻하고,
+    # `(?:...)`는 치환에 필요 없는 비캡처 그룹이며, `re.I`로 언어 이름의 대소문자를
+    # 구분하지 않는다. `^`/`$`와 `text.strip()`으로 양 끝의 펜스만 처리한다.
     text = re.sub(r"^```(?:text|markdown)?\s*|\s*```$", "", text.strip(), flags=re.I)
     return text.strip()
 
@@ -272,11 +289,20 @@ def normalize_commit(text: str, convention: dict) -> str:
 
 def normalize_pr(text: str, convention: dict) -> str:
     text = clean_text(text)
+    # `re.M`(`m`)로 각 줄을 시작점으로 취급하고 `re.I`(`i`)로 `Title:`의
+    # 대소문자를 무시한다. 줄 시작의 `title:` 뒤 공백을 건너뛴 다음, 해당 줄의
+    # 나머지 한 글자 이상(`.+`)을 캡처해 PR 제목으로 사용한다. `$`는 제목이
+    # 여러 줄로 번지지 않도록 줄 끝을 지정한다.
     title_match = re.search(r"(?im)^title:\s*(.+)$", text)
     title = (title_match.group(1).strip() if title_match else "변경 사항 반영")[:80]
     sections = {}
     section_names = convention["pr"]["sections"]
     for name in section_names:
+        # `re.M`로 `^`가 모든 줄의 시작을 가리키게 하고, `re.S`로 `.`이 줄바꿈도
+        # 포함하도록 한다. `^##\s*`는 Markdown 2단계 헤더를 찾고, `re.escape(name)`은
+        # 설정값을 정규식 문법이 아닌 글자 그대로 비교하게 한다. 헤더 뒤 줄바꿈부터
+        # 다음 `##` 헤더 또는 문자열 끝(`\Z`) 직전까지를 최소 반복(`.*?`)으로 캡처한다.
+        # 따라서 현재 섹션의 내용만 `group(1)`으로 얻을 수 있다.
         match = re.search(rf"(?ms)^##\s*{re.escape(name)}\s*\n(.*?)(?=^##\s|\Z)", text)
         content = match.group(1).strip() if match else "- 변경 사항을 확인합니다."
         bullets = [line.strip() for line in content.splitlines() if line.strip().startswith("-")]
