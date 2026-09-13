@@ -1,0 +1,17 @@
+# E1-2에서 확인한 팀 커밋 스타일을 재현하는 예시 설정입니다.
+commit:
+  prefixes: [Feat, Fix, Docs, Refactor, Test, Chore]
+  scope: false
+  language: 한국어
+  max_title_length: 72
+  body_bullets: 3
+pr:
+  tone: 간결하고 사실 중심
+  title_prefix: true
+  sections:
+    - Why
+    - What
+    - How to Test
+  checklist:
+    - 변경 내용을 직접 확인했나요?
+    - 테스트 또는 실행 방법을 확인했나요?

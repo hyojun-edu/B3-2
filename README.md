@@ -45,12 +45,45 @@ API 키는 코드나 커밋 파일에 저장하지 마세요.
 --endpoint URL              기본값: https://copa.codyssey.kr/v1/chat/completions
 --timeout SECONDS           기본값: 60
 --safe-mode                 민감정보 마스킹, 최대 10개 파일/200줄 전송
+--convention FILE           기본값: .ai-gitgen.yml
 ```
 
 예를 들어 민감정보가 포함될 가능성이 있는 변경은 다음처럼 실행합니다.
 
 ```bash
 python3 main.py pr --safe-mode --temperature 0.1
+```
+
+### 커스텀 팀 컨벤션
+
+선택한 이전 미션 저장소 `hyojun-edu/E1-2`의 로컬 커밋 이력을 분석한 결과, 커밋은 `Feat:`, `Fix:`, `Docs:`처럼 **대문자 prefix + 콜론 + 공백**을 사용하고 scope는 표기하지 않았습니다. 메시지는 한국어로 기능을 짧게 설명하는 형태가 많았습니다. 이를 예시 팀 컨벤션으로 정의해 기본 설정 파일 [`.ai-gitgen.yml`](.ai-gitgen.yml)에 반영했습니다.
+
+- 커밋 prefix: `Feat`, `Fix`, `Docs`, `Refactor`, `Test`, `Chore`
+- 커밋 scope: 사용하지 않음
+- 커밋 본문: 최대 3개 bullet, 제목 최대 72자
+- PR 톤: 간결하고 사실 중심
+- PR 섹션: `Why`, `What`, `How to Test`
+- PR 체크리스트: 변경 확인, 테스트/실행 방법 확인
+
+설정 파일을 바꾸거나 `--convention`으로 다른 파일을 지정할 수 있습니다.
+
+```bash
+python3 main.py commit
+python3 main.py pr --convention ./team-convention.yml
+```
+
+기본 프롬프트 적용 전에는 `feat: add ...`처럼 소문자 prefix와 고정 PR 섹션을 사용했지만, 적용 후에는 E1-2 스타일에 맞춰 `Feat: ...` 형태를 요청하고 설정된 PR 체크리스트까지 출력합니다.
+
+```text
+# 적용 전
+feat: add quiz history
+
+# 적용 후 (.ai-gitgen.yml)
+Feat: 퀴즈 기록 히스토리 추가
+
+Checklist:
+- [ ] 변경 내용을 직접 확인했나요?
+- [ ] 테스트 또는 실행 방법을 확인했나요?
 ```
 
 safe mode는 API 키, bearer 인증값, token/secret/password 형태의 값과 이메일 주소를 마스킹하고 diff를 제한합니다. 그래도 생성 결과와 전송 전 diff를 사용자가 검토해야 합니다. API 호출 비용과 rate limit을 고려해 필요한 명령만 실행하세요.
