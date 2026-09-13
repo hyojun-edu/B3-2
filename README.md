@@ -88,8 +88,8 @@ token/secret/password 형태의 값, 이메일 주소)은 항상 적용되고, �
 - 커밋 scope: 사용하지 않음
 - 커밋 본문: 최대 3개 bullet, 제목 최대 72자
 - PR 톤: 간결하고 사실 중심
-- PR 섹션: `Why`, `What`, `How to Test`
-- PR 체크리스트: 변경 확인, 테스트/실행 방법 확인
+- PR 섹션: `Why`, `What`, `How to Test`, `Checklist`
+- `Checklist`도 다른 PR 섹션과 동일하게 변경 내용에 맞춰 생성
 
 설정 파일을 바꾸거나 `--convention`으로 다른 파일을 지정할 수 있습니다.
 
@@ -98,7 +98,7 @@ python3 main.py commit
 python3 main.py pr --convention ./team-convention.yml
 ```
 
-기본 프롬프트 적용 전에는 `feat: add ...`처럼 소문자 prefix와 고정 PR 섹션을 사용했지만, 적용 후에는 E1-2 스타일에 맞춰 `Feat: ...` 형태를 요청하고 설정된 PR 체크리스트까지 출력합니다.
+기본 프롬프트 적용 전에는 `feat: add ...`처럼 소문자 prefix와 고정 PR 섹션을 사용했지만, 적용 후에는 E1-2 스타일에 맞춰 `Feat: ...` 형태를 요청하고 변경 내용에 맞는 `Checklist` 섹션까지 생성합니다.
 
 ```text
 # 적용 전
@@ -107,7 +107,7 @@ feat: add quiz history
 # 적용 후 (.ai-gitgen.yml)
 Feat: 퀴즈 기록 히스토리 추가
 
-Checklist:
+## Checklist
 - [ ] 변경 내용을 직접 확인했나요?
 - [ ] 테스트 또는 실행 방법을 확인했나요?
 ```
@@ -200,7 +200,7 @@ Title: feat: add AI generated Git draft command
 좋은 프롬프트는 “요약해 줘”에 그치지 않고 출력 계약과 근거를 함께 제공합니다.
 
 1. **역할과 목적**: system 메시지에서 Git 텍스트를 정확히 생성하고 요청 형식을 따르도록 역할을 고정합니다.
-2. **출력 형식**: commit은 최대 72자의 제목과 선택적인 1~3개 bullet, `feat`·`fix`·`refactor`·`docs` 같은 conventional prefix를 명시합니다. PR은 최대 80자의 `Title`과 `Why`, `What`, `How to Test` 세 섹션을 정확히 요구합니다.
+2. **출력 형식**: commit은 최대 72자의 제목과 선택적인 1~3개 bullet, `feat`·`fix`·`refactor`·`docs` 같은 conventional prefix를 명시합니다. PR은 최대 80자의 `Title`과 설정된 섹션을 정확히 요구합니다.
 3. **변경 맥락**: `Git status`와 `Git diff`를 함께 넣어 파일명, 변경 범위, 테스트 방법처럼 실제 변경에서 확인 가능한 근거를 제공합니다.
 4. **추측 방지**: 실제 변경을 사용하고 합리적인 테스트 명령을 작성하라고 지시해 diff에 없는 기능이나 검증 결과를 만들지 않도록 합니다.
 
@@ -212,8 +212,8 @@ AI 출력은 확률적으로 생성되므로 그대로 실무 산출물로 사�
 
 - 공백과 코드 펜스를 제거해 복사하기 쉬운 텍스트로 만듭니다.
 - commit 제목을 첫 줄에서 가져와 72자로 제한하고, 뒤의 최대 3개 줄을 bullet 형식으로 정리합니다.
-- PR 제목을 `Title:`에서 추출해 80자로 제한하고 `Why`, `What`, `How to Test` 섹션을 모두 유지합니다. 누락된 섹션이나 bullet은 기본 안내 문구로 보완합니다.
-- 지정하지 않은 PR 섹션이 출력되어도 허용된 세 섹션만 남겨 템플릿을 지킵니다.
+- PR 제목을 `Title:`에서 추출해 80자로 제한하고 설정된 섹션을 모두 유지합니다. 누락된 섹션이나 bullet은 기본 안내 문구로 보완합니다.
+- 지정하지 않은 PR 섹션이 출력되어도 설정된 섹션만 남겨 템플릿을 지킵니다.
 
 이 검증은 길이 초과, 섹션 누락, Markdown 형식 불일치로 다시 수작업할 비용을 줄입니다. 다만 길이를 자르는 것만으로 의미가 보장되지는 않으므로, 최종 적용 전에는 실제 diff와 대조해 제목이 핵심 변경을 설명하는지, 테스트 명령이 실제로 존재하는지, 민감정보나 과장된 표현이 없는지 확인해야 합니다. 필요하면 형식 지시를 구체화하거나 `temperature`를 낮추고, 출력이 잘리는 경우에만 `max_tokens`를 조정합니다.
 
@@ -264,9 +264,9 @@ Title: feat: add regex comments for secret masking and PR parsing
 - [ ] 변경 내용을 직접 확인했나요?
 - [ ] 테스트 또는 실행 방법을 확인했나요?
 
-Checklist:
+## Checklist
 - [ ] 변경 내용을 직접 확인했나요?
 - [ ] 테스트 또는 실행 방법을 확인했나요?
 ----------------------
 
-- 
+-

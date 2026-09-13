@@ -28,8 +28,7 @@ DEFAULT_CONVENTION = {
     "pr": {
         "tone": "간결하고 사실 중심",
         "title_prefix": True,
-        "sections": ["Why", "What", "How to Test"],
-        "checklist": [],
+        "sections": ["Why", "What", "How to Test", "Checklist"],
     },
     "safe_mode": {
         "max_files": 10,
@@ -105,7 +104,7 @@ def load_convention(path: str) -> dict:
             parent[key.strip()] = {}
             stack.append((indent, parent[key.strip()]))
             pending_list = None
-        if key.strip() in ("sections", "checklist", "mask_patterns"):
+        if key.strip() in ("sections", "mask_patterns"):
             parent[key.strip()] = []
             pending_list = parent[key.strip()]
     _merge_dict(convention, parsed)
@@ -255,9 +254,6 @@ def pr_prompt(status: str, diff: str, convention: dict) -> str:
     commit_rules = convention["commit"]
     sections = rules["sections"]
     section_format = "\n\n".join(f"## {name}\n- ..." for name in sections)
-    checklist = ""
-    if rules["checklist"]:
-        checklist = "\n\nChecklist:\n" + "\n".join(f"- [ ] {item}" for item in rules["checklist"])
     if rules["title_prefix"]:
         prefixes = ", ".join(commit_rules["prefixes"])
         prefix_rule = f"Use one of these exact title prefixes with the configured capitalization: {prefixes}."
@@ -266,7 +262,7 @@ def pr_prompt(status: str, diff: str, convention: dict) -> str:
     return f"""Create a pull request draft from this Git change. Use a {rules['tone']} tone. Write the title and all section content in {commit_rules['language']}. Output exactly this Markdown structure, with at least one bullet under every section:
 Title: <one-line title, maximum 80 characters>
 
-{section_format}{checklist}
+{section_format}
 {prefix_rule} Do not add unconfigured sections. Use the actual change and sensible test commands.
 
 Git status:
@@ -292,14 +288,14 @@ def normalize_pr(text: str, convention: dict) -> str:
     sections = {}
     section_names = convention["pr"]["sections"]
     for name in section_names:
-        match = re.search(rf"(?ms)^##\s*{re.escape(name)}\s*\n(.*?)(?=^##\s|\Z)", text)
+        match = re.search(
+            rf"(?ms)^##\s*{re.escape(name)}\s*\n(.*?)(?=^##\s|\Z)",
+            text,
+        )
         content = match.group(1).strip() if match else "- 변경 사항을 확인합니다."
         bullets = [line.strip() for line in content.splitlines() if line.strip().startswith("-")]
         sections[name] = "\n".join(bullets or ["- 변경 사항을 확인합니다."])
-    checklist = ""
-    if convention["pr"]["checklist"]:
-        checklist = "\n\nChecklist:\n" + "\n".join(f"- [ ] {item}" for item in convention["pr"]["checklist"])
-    return f"Title: {title}\n\n" + "\n\n".join(f"## {name}\n{sections[name]}" for name in sections) + checklist
+    return f"Title: {title}\n\n" + "\n\n".join(f"## {name}\n{sections[name]}" for name in sections)
 
 
 def main() -> int:
