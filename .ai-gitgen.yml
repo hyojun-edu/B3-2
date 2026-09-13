@@ -1,8 +1,8 @@
 # E1-2에서 확인한 팀 커밋 스타일을 재현하는 예시 설정입니다.
+language: 한국어
 commit:
   prefixes: [Feat, Fix, Docs, Refactor, Test, Chore]
   scope: false
-  language: 한국어
   max_title_length: 72
   body_bullets: 3
 pr:

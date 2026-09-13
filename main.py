@@ -18,17 +18,17 @@ DEFAULT_MODEL = "gpt-5.4-mini"
 DEFAULT_CONVENTION_FILE = ".ai-gitgen.yml"
 
 DEFAULT_CONVENTION = {
+    "language": "영어",
     "commit": {
-        "prefixes": ["Feat", "Fix", "Docs", "Refactor", "Test", "Chore"],
-        "scope": False,
-        "language": "한국어",
+        "prefixes": ["feat", "fix", "docs", "refactor", "test", "chore"],
+        "scope": True,
         "max_title_length": 72,
         "body_bullets": 3,
     },
     "pr": {
         "tone": "간결하고 사실 중심",
-        "title_prefix": True,
-        "sections": ["Why", "What", "How to Test", "Checklist"],
+        "title_prefix": False,
+        "sections": ["Why", "What"],
     },
     "safe_mode": {
         "max_files": 10,
@@ -265,7 +265,7 @@ def commit_prompt(status: str, diff: str, convention: dict) -> str:
     rules = convention["commit"]
     prefixes = ", ".join(rules["prefixes"])
     scope = "Use a scope in parentheses when useful." if rules["scope"] else "Do not use a scope."
-    return f"""Create a commit message from this Git change. Output only the message: a single title line (maximum {rules['max_title_length']} characters), optionally followed by a blank line and up to {rules['body_bullets']} bullet lines. Write in {rules['language']}. Use one of these exact prefixes with the configured capitalization: {prefixes}. {scope} Keep the message concise and factual.\n\nGit status:\n{status}\n\nGit diff:\n{diff}"""
+    return f"""Create a commit message from this Git change. Output only the message: a single title line (maximum {rules['max_title_length']} characters), optionally followed by a blank line and up to {rules['body_bullets']} bullet lines. Write in {convention['language']}. Use one of these exact prefixes with the configured capitalization: {prefixes}. {scope} Keep the message concise and factual.\n\nGit status:\n{status}\n\nGit diff:\n{diff}"""
 
 
 def pr_prompt(status: str, diff: str, convention: dict) -> str:
@@ -278,7 +278,7 @@ def pr_prompt(status: str, diff: str, convention: dict) -> str:
         prefix_rule = f"Use one of these exact title prefixes with the configured capitalization: {prefixes}."
     else:
         prefix_rule = "Do not force a prefix in the title."
-    return f"""Create a pull request draft from this Git change. Use a {rules['tone']} tone. Write the title and all section content in {commit_rules['language']}. Output exactly this Markdown structure, with at least one bullet under every section:
+    return f"""Create a pull request draft from this Git change. Use a {rules['tone']} tone. Write the title and all section content in {convention['language']}. Output exactly this Markdown structure, with at least one bullet under every section:
 Title: <one-line title, maximum 80 characters>
 
 {section_format}
