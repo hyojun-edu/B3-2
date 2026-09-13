@@ -355,3 +355,69 @@ Title: Docs: 커밋·PR 템플릿 예시와 설정 파일 정리
 - [x] PR 제목 형식을 지정된 접두사 규칙에 맞췄습니다.
 ----------------------
 ```
+### 3. 안전 모드 고도화
+- safe-mode 기본 정책
+1. safe mode에서 전송할 최대 파일 수 기본값: 10
+2. safe mode에서 전송할 최대 diff 줄 수 기본값: 200
+3. 기본 마스크 패턴 4가지
+```
+- 인증 토큰 마스킹
+# 대소문자를 구분하지 않고 `authorization:` 뒤의 공백과 `bearer` 토큰을
+# 캡처한다. 토큰 값은 공백이 나올 때까지(`[^\s]+`) 포함하며, 치환 시
+# 첫 번째 캡처 그룹(헤더 부분)은 보존하고 인증값만 `[REDACTED]`로 바꾼다.
+(r"(?i)(authorization:\s*bearer\s+)[^\s]+", r"\1[REDACTED]"),
+
+- API KEY 마스킹
+# `api_key`, `api-key`, `apikey`처럼 밑줄/하이픈이 있거나 없는 API 키
+# 이름을 찾는다. `=` 또는 `:` 앞뒤의 선택적 공백까지 헤더로 캡처하고,
+# 쉼표·세미콜론·공백 전까지를 키 값으로 보아 값만 마스킹한다.
+(r"(?i)(api[_-]?key\s*[=:]\s*)[^\s,;]+", r"\1[REDACTED]")
+
+- 비밀번호, 토큰 마스킹
+# `secret`, `token`, `password`, `passwd` 중 하나가 키 이름으로 나오고
+# `=` 또는 `:` 뒤에 값이 이어지는 형태를 찾는다. 키 이름과 구분자 앞의
+# 부분을 캡처해 두지만, 현재 치환식은 캡처 그룹 1(키 이름) 뒤를
+# 고정 문자열로 대체하므로 원문의 구분자/공백은 보존하지 않는다.
+(r"(?i)(secret|token|password|passwd)\s*[=:]\s*[^\s,;]+", r"\1=[REDACTED]")
+
+- 이메일 마스킹
+# 이메일의 로컬 파트(`+`, `.`, `-`, 영숫자 등)와 `@` 뒤의 도메인을
+# 찾는다. 도메인은 하나 이상의 `.` 구간을 요구하므로 `a@b.c`는
+# 매칭하지만 `a@b`는 매칭하지 않으며, 주소 전체를 마스킹한다.
+(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[REDACTED_EMAIL]")
+```
+- safe-mode OFF 결과
+```
+% python3 main.py commit
+[INFO] Git status 수집 완료: 3개 항목
+M .gitignore
+ M README.md
+ M main.py
+[INFO] Git diff 수집 완료: 124줄
+[INFO] AI API 요청 중... (1회)
+[DONE] 생성 완료
+
+--- Commit Message ---
+fix(main): return safe-mode diff line count from limiter
+- Make limit_diff return both truncated diff and counted lines
+- Use the returned count in git_context for safe-mode output
+- Keep non-safe mode line counting unchanged
+```
+- safe-mode ON 결과
+```
+% python3 main.py commit --safe-mode --safe-max-lines 30
+[INFO] Git status 수집 완료: 3개 항목
+M  .gitignore
+MM README.md
+ M main.py
+[INFO] Git diff 수집 완료: 30줄
+[INFO] AI API 요청 중... (1회)
+[DONE] 생성 완료
+
+--- Commit Message ---
+docs(readme): document safe mode limits and masking rules
+- Add default caps for files and diff lines in safe mode
+- Describe four built-in redaction patterns
+- Ignore local ai-gitgen config file
+----------------------
+```

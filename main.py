@@ -153,12 +153,14 @@ def git_context(safe_mode: bool, safe_config: Optional[dict] = None) -> tuple[st
     if safe_mode:
         safe_config = safe_config or {}
         diff = mask_secrets(diff, safe_config.get("mask_patterns", []))
-        diff = limit_diff(
+        diff, line_count = limit_diff(
             diff,
             max_files=safe_config.get("max_files", 10),
             max_lines=safe_config.get("max_lines", 200),
         )
-    return status, diff, len(diff.splitlines())
+    else:
+        line_count = len(diff.splitlines())
+    return status, diff, line_count
 
 
 def mask_secrets(text: str, extra_patterns: Optional[list] = None) -> str:
@@ -201,7 +203,7 @@ def mask_secrets(text: str, extra_patterns: Optional[list] = None) -> str:
     return text
 
 
-def limit_diff(text: str, max_files: int = 10, max_lines: int = 200) -> str:
+def limit_diff(text: str, max_files: int = 10, max_lines: int = 200) -> tuple[str, int]:
     if max_files < 0 or max_lines < 0:
         raise ValueError("safe mode의 max_files/max_lines는 0 이상이어야 합니다.")
     lines = text.splitlines()
@@ -218,9 +220,10 @@ def limit_diff(text: str, max_files: int = 10, max_lines: int = 200) -> str:
             break
         output.append(line)
         count += 1
+    line_count = count
     if truncated:
         output.append(f"[safe-mode: diff가 파일 {max_files}개/{max_lines}줄로 제한되었습니다]")
-    return "\n".join(output)
+    return "\n".join(output), line_count
 
 
 def call_api(prompt: str, args: argparse.Namespace) -> str:
