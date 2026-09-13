@@ -44,7 +44,10 @@ API 키는 코드나 커밋 파일에 저장하지 마세요.
 --max-tokens NUMBER        기본값: 600
 --endpoint URL              기본값: https://copa.codyssey.kr/v1/chat/completions
 --timeout SECONDS           기본값: 60
---safe-mode                 민감정보 마스킹, 최대 10개 파일/200줄 전송
+--safe-mode                 민감정보 마스킹, diff 전송량 제한
+--safe-max-files NUMBER     safe mode 최대 파일 수 (기본값: 10)
+--safe-max-lines NUMBER     safe mode 최대 diff 줄 수 (기본값: 200)
+--safe-mask-regex RULE      추가 마스킹 규칙 (REGEX=>REPLACEMENT), 반복 지정 가능
 --convention FILE           기본값: .ai-gitgen.yml
 ```
 
@@ -53,6 +56,29 @@ API 키는 코드나 커밋 파일에 저장하지 마세요.
 ```bash
 python3 main.py pr --safe-mode --temperature 0.1
 ```
+
+safe mode의 기본 제한을 명령별로 조정할 수도 있습니다.
+
+```bash
+python3 main.py commit --safe-mode --safe-max-files 5 --safe-max-lines 80
+python3 main.py pr --safe-mode --safe-mask-regex 'internal-[A-Za-z0-9]+=>[REDACTED_INTERNAL]'
+```
+
+팀 공통 설정은 컨벤션 파일의 `safe_mode`에 작성합니다. `mask_patterns`는
+`정규식=>치환값` 형식이며 여러 규칙을 줄 목록으로 추가할 수 있습니다.
+
+```yaml
+safe_mode:
+  max_files: 5
+  max_lines: 120
+  mask_patterns:
+    - "(?i)(internal_id\\s*[=:]\\s*)[^\\s]+=>\\1[REDACTED_INTERNAL]"
+    - "sk-[A-Za-z0-9]+=>[REDACTED_API_KEY]"
+```
+
+CLI 옵션은 컨벤션 파일보다 우선합니다. 기본 마스킹 규칙(API 키, bearer 인증값,
+token/secret/password 형태의 값, 이메일 주소)은 항상 적용되고, 사용자 규칙은
+그 뒤에 추가 적용됩니다. 제한에 도달하면 diff 끝에 실제 적용된 파일/줄 수가 표시됩니다.
 
 ### 커스텀 팀 컨벤션
 
@@ -86,7 +112,7 @@ Checklist:
 - [ ] 테스트 또는 실행 방법을 확인했나요?
 ```
 
-safe mode는 API 키, bearer 인증값, token/secret/password 형태의 값과 이메일 주소를 마스킹하고 diff를 제한합니다. 그래도 생성 결과와 전송 전 diff를 사용자가 검토해야 합니다. API 호출 비용과 rate limit을 고려해 필요한 명령만 실행하세요.
+safe mode는 API 키, bearer 인증값, token/secret/password 형태의 값과 이메일 주소를 마스킹하고 diff를 제한합니다. `safe_mode.mask_patterns` 또는 `--safe-mask-regex`로 정규표현식 기반 규칙을 추가하고, 파일/줄 제한도 조정할 수 있습니다. 그래도 생성 결과와 전송 전 diff를 사용자가 검토해야 합니다. API 호출 비용과 rate limit을 고려해 필요한 명령만 실행하세요.
 
 ## 출력 예시
 
@@ -167,7 +193,7 @@ Title: feat: add AI generated Git draft command
 - `git diff HEAD`: HEAD 기준 staged/unstaged 추적 파일의 변경을 가져옵니다. 아직 HEAD가 없는 초기 저장소에서는 `git diff`와 `git diff --cached`를 합칩니다.
 - untracked 파일: `git diff`에 포함되지 않으므로 `status`의 `??` 항목을 찾아 파일 내용을 별도로 읽어 문맥에 덧붙입니다.
 
-수집한 `status`와 `diff` 문자열을 프롬프트 입력으로 전달하는 것이 자동화의 핵심입니다. `--safe-mode`에서는 API 키·token·secret·password·bearer 값과 이메일을 마스킹하고 전송 diff를 최대 10개 파일·200줄로 제한합니다. 즉, Git 명령 실행 → 결과 수집·보호 → 프롬프트 삽입 → API 요청의 흐름입니다. `subprocess` 오류도 `GitError`로 바꿔 원인을 표시합니다.
+수집한 `status`와 `diff` 문자열을 프롬프트 입력으로 전달하는 것이 자동화의 핵심입니다. `--safe-mode`에서는 API 키·token·secret·password·bearer 값과 이메일을 마스킹하고 전송 diff를 기본 최대 10개 파일·200줄로 제한합니다. `safe_mode` 설정 또는 CLI 옵션으로 이 정책과 추가 정규식 규칙을 바꿀 수 있습니다. 즉, Git 명령 실행 → 결과 수집·보호 → 프롬프트 삽입 → API 요청의 흐름입니다. `subprocess` 오류도 `GitError`로 바꿔 원인을 표시합니다.
 
 ### 4. Commit/PR 양식과 변경 맥락을 반영하는 프롬프트 구성
 

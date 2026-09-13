@@ -10,6 +10,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Optional
 
 
 DEFAULT_ENDPOINT = "https://copa.codyssey.kr/v1/chat/completions"
@@ -29,6 +30,12 @@ DEFAULT_CONVENTION = {
         "title_prefix": True,
         "sections": ["Why", "What", "How to Test"],
         "checklist": [],
+    },
+    "safe_mode": {
+        "max_files": 10,
+        "max_lines": 200,
+        # Each item uses the form: regular-expression => replacement.
+        "mask_patterns": [],
     },
 }
 
@@ -98,7 +105,7 @@ def load_convention(path: str) -> dict:
             parent[key.strip()] = {}
             stack.append((indent, parent[key.strip()]))
             pending_list = None
-        if key.strip() == "sections" or key.strip() == "checklist":
+        if key.strip() in ("sections", "checklist", "mask_patterns"):
             parent[key.strip()] = []
             pending_list = parent[key.strip()]
     _merge_dict(convention, parsed)
@@ -113,7 +120,7 @@ def _merge_dict(base: dict, override: dict) -> None:
             base[key] = value
 
 
-def git_context(safe_mode: bool) -> tuple[str, str, int]:
+def git_context(safe_mode: bool, safe_config: Optional[dict] = None) -> tuple[str, str, int]:
     try:
         root = Path(run_git("rev-parse", "--show-toplevel").strip())
     except GitError as exc:
@@ -145,37 +152,59 @@ def git_context(safe_mode: bool) -> tuple[str, str, int]:
         diff += "\n" + "\n".join(untracked)
 
     if safe_mode:
-        diff = mask_secrets(diff)
-        diff = limit_diff(diff)
+        safe_config = safe_config or {}
+        diff = mask_secrets(diff, safe_config.get("mask_patterns", []))
+        diff = limit_diff(
+            diff,
+            max_files=safe_config.get("max_files", 10),
+            max_lines=safe_config.get("max_lines", 200),
+        )
     return status, diff, len(diff.splitlines())
 
 
-def mask_secrets(text: str) -> str:
+def mask_secrets(text: str, extra_patterns: Optional[list] = None) -> str:
     patterns = [
         (r"(?i)(authorization:\s*bearer\s+)[^\s]+", r"\1[REDACTED]"),
         (r"(?i)(api[_-]?key\s*[=:]\s*)[^\s,;]+", r"\1[REDACTED]"),
         (r"(?i)(secret|token|password|passwd)\s*[=:]\s*[^\s,;]+", r"\1=[REDACTED]"),
         (r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[REDACTED_EMAIL]"),
     ]
+    for item in extra_patterns or []:
+        if isinstance(item, (list, tuple)) and len(item) == 2:
+            pattern, replacement = item
+        elif isinstance(item, str) and "=>" in item:
+            pattern, replacement = item.split("=>", 1)
+        else:
+            raise ValueError("safe_mode.mask_patterns는 '정규식=>치환값' 형식이어야 합니다.")
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise ValueError(f"safe mode 마스킹 정규식이 올바르지 않습니다: {pattern}: {exc}") from exc
+        patterns.append((pattern, replacement))
     for pattern, replacement in patterns:
         text = re.sub(pattern, replacement, text)
     return text
 
 
 def limit_diff(text: str, max_files: int = 10, max_lines: int = 200) -> str:
+    if max_files < 0 or max_lines < 0:
+        raise ValueError("safe mode의 max_files/max_lines는 0 이상이어야 합니다.")
     lines = text.splitlines()
     output, files, count = [], 0, 0
+    truncated = False
     for line in lines:
         if line.startswith("diff --git ") or line.startswith("--- new file: "):
             files += 1
             if files > max_files:
+                truncated = True
                 break
         if count >= max_lines:
+            truncated = True
             break
         output.append(line)
         count += 1
-    if len(lines) > len(output):
-        output.append("[safe-mode: diff가 파일 10개/200줄로 제한되었습니다]")
+    if truncated:
+        output.append(f"[safe-mode: diff가 파일 {max_files}개/{max_lines}줄로 제한되었습니다]")
     return "\n".join(output)
 
 
@@ -267,11 +296,35 @@ def main() -> int:
     parser.add_argument("--endpoint", default=os.getenv("OPENAI_API_ENDPOINT", DEFAULT_ENDPOINT))
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument("--safe-mode", action="store_true", help="민감정보 마스킹 및 diff 전송량 제한")
+    parser.add_argument(
+        "--safe-max-files",
+        type=int,
+        help="safe mode에서 전송할 최대 파일 수 (기본값: 10)",
+    )
+    parser.add_argument(
+        "--safe-max-lines",
+        type=int,
+        help="safe mode에서 전송할 최대 diff 줄 수 (기본값: 200)",
+    )
+    parser.add_argument(
+        "--safe-mask-regex",
+        action="append",
+        default=[],
+        metavar="REGEX=>REPLACEMENT",
+        help="safe mode에 추가할 마스킹 규칙. 여러 번 지정 가능",
+    )
     parser.add_argument("--convention", default=DEFAULT_CONVENTION_FILE, help="커밋/PR 컨벤션 YAML 파일 경로")
     args = parser.parse_args()
     try:
         convention = load_convention(args.convention)
-        status, diff, line_count = git_context(args.safe_mode)
+        safe_config = dict(convention.get("safe_mode", {}))
+        if args.safe_max_files is not None:
+            safe_config["max_files"] = args.safe_max_files
+        if args.safe_max_lines is not None:
+            safe_config["max_lines"] = args.safe_max_lines
+        if args.safe_mask_regex:
+            safe_config["mask_patterns"] = list(safe_config.get("mask_patterns", [])) + args.safe_mask_regex
+        status, diff, line_count = git_context(args.safe_mode, safe_config)
         if not status:
             print("[INFO] 변경 사항이 없습니다. 생성을 종료합니다.")
             return 0
@@ -286,7 +339,7 @@ def main() -> int:
         print(normalize_commit(result, convention) if args.command == "commit" else normalize_pr(result, convention))
         print("----------------------")
         return 0
-    except (GitError, RuntimeError) as exc:
+    except (GitError, RuntimeError, ValueError, TypeError) as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
 
