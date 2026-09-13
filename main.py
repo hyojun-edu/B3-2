@@ -163,9 +163,22 @@ def git_context(safe_mode: bool, safe_config: Optional[dict] = None) -> tuple[st
 
 def mask_secrets(text: str, extra_patterns: Optional[list] = None) -> str:
     patterns = [
+        # 대소문자를 구분하지 않고 `authorization:` 뒤의 공백과 `bearer` 토큰을
+        # 캡처한다. 토큰 값은 공백이 나올 때까지(`[^\s]+`) 포함하며, 치환 시
+        # 첫 번째 캡처 그룹(헤더 부분)은 보존하고 인증값만 `[REDACTED]`로 바꾼다.
         (r"(?i)(authorization:\s*bearer\s+)[^\s]+", r"\1[REDACTED]"),
+        # `api_key`, `api-key`, `apikey`처럼 밑줄/하이픈이 있거나 없는 API 키
+        # 이름을 찾는다. `=` 또는 `:` 앞뒤의 선택적 공백까지 헤더로 캡처하고,
+        # 쉼표·세미콜론·공백 전까지를 키 값으로 보아 값만 마스킹한다.
         (r"(?i)(api[_-]?key\s*[=:]\s*)[^\s,;]+", r"\1[REDACTED]"),
+        # `secret`, `token`, `password`, `passwd` 중 하나가 키 이름으로 나오고
+        # `=` 또는 `:` 뒤에 값이 이어지는 형태를 찾는다. 키 이름과 구분자 앞의
+        # 부분을 캡처해 두지만, 현재 치환식은 캡처 그룹 1(키 이름) 뒤를
+        # 고정 문자열로 대체하므로 원문의 구분자/공백은 보존하지 않는다.
         (r"(?i)(secret|token|password|passwd)\s*[=:]\s*[^\s,;]+", r"\1=[REDACTED]"),
+        # 이메일의 로컬 파트(`+`, `.`, `-`, 영숫자 등)와 `@` 뒤의 도메인을
+        # 찾는다. 도메인은 하나 이상의 `.` 구간을 요구하므로 `a@b.c`는
+        # 매칭하지만 `a@b`는 매칭하지 않으며, 주소 전체를 마스킹한다.
         (r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", "[REDACTED_EMAIL]"),
     ]
     for item in extra_patterns or []:
@@ -176,6 +189,9 @@ def mask_secrets(text: str, extra_patterns: Optional[list] = None) -> str:
         else:
             raise ValueError("safe_mode.mask_patterns는 '정규식=>치환값' 형식이어야 합니다.")
         try:
+            # 설정 파일/CLI에서 전달된 동적 정규식은 실제 치환 전에 컴파일해
+            # 문법 오류를 조기에 확인한다. 이 값은 고정 리터럴이 아니므로
+            # 사용자가 원하는 추가 마스킹 규칙을 그대로 지원한다.
             re.compile(pattern)
         except re.error as exc:
             raise ValueError(f"safe mode 마스킹 정규식이 올바르지 않습니다: {pattern}: {exc}") from exc
@@ -238,6 +254,9 @@ def call_api(prompt: str, args: argparse.Namespace) -> str:
 
 
 def clean_text(text: str) -> str:
+    # 문자열 맨 앞의 Markdown 코드 펜스(`````, 선택적인 text/markdown 언어명,
+    # 뒤따르는 공백) 또는 맨 끝의 닫는 펜스를 제거한다. `|`로 두 경우를
+    # 나누고 `re.I`로 언어명 대소문자를 무시해 모델 응답을 일반 텍스트로 정리한다.
     text = re.sub(r"^```(?:text|markdown)?\s*|\s*```$", "", text.strip(), flags=re.I)
     return text.strip()
 
@@ -283,11 +302,18 @@ def normalize_commit(text: str, convention: dict) -> str:
 
 def normalize_pr(text: str, convention: dict) -> str:
     text = clean_text(text)
+    # 줄의 시작(`^`)에 있는 `Title:`을 대소문자 구분 없이 찾고, 콜론 뒤의
+    # 공백을 건너뛴 뒤 그 줄의 제목 내용(`.+`)을 캡처한다. `re.M`은 여러 줄
+    # 문자열에서 각 줄을 시작점으로 취급하고, `re.I`는 `title:`도 허용한다.
     title_match = re.search(r"(?im)^title:\s*(.+)$", text)
     title = (title_match.group(1).strip() if title_match else "변경 사항 반영")[:80]
     sections = {}
     section_names = convention["pr"]["sections"]
     for name in section_names:
+        # 설정된 섹션 이름을 Markdown 헤더(`##`)에서 찾는다. 헤더 안의
+        # 선택적 공백을 허용하고, 해당 헤더 다음 줄부터 다음 `##` 헤더 또는
+        # 문자열 끝(`\Z`) 직전까지를 비탐욕적으로 캡처한다. `re.M`은 헤더를
+        # 줄 단위로 찾게 하고, `re.S`는 섹션 내용의 줄바꿈도 `.`에 포함한다.
         match = re.search(
             rf"(?ms)^##\s*{re.escape(name)}\s*\n(.*?)(?=^##\s|\Z)",
             text,
