@@ -221,52 +221,57 @@ AI 출력은 확률적으로 생성되므로 그대로 실무 산출물로 사�
 
 API 키 누락, HTTP 인증 오류, 네트워크 오류, 잘못된 API 응답은 원인과 함께 `[ERROR]` 메시지로 출력하고 실패 코드로 종료합니다. API 서버가 다른 주소라면 `--endpoint` 옵션 또는 `OPENAI_API_ENDPOINT` 환경변수로 변경할 수 있습니다.
 
-### 6. 실제 리포지토리에 적용하여 PR 1건 완성하기
+## 보너스 과제
+### 1. 실제 리포지토리에 적용하여 PR 1건 완성하기
 - "의미 있는 변경"을 improve-comment branch에서 수행
 - commit message 생성
 ```
 % python3 main.py commit --convention ./.ai-gitgen.yml
 [INFO] Git status 수집 완료: 1개 항목
 M main.py
-[INFO] Git diff 수집 완료: 59줄
+[INFO] Git diff 수집 완료: 66줄
 [INFO] AI API 요청 중... (1회)
 [DONE] 생성 완료
 
 --- Commit Message ---
-Docs: 정규식 마스킹 및 텍스트 정규화 주석 추가
-- 비밀값 마스킹 패턴의 동작 설명을 보강함
-- 코드 펜스 제거와 PR 섹션 추출 정규식 주석을 추가함
+Docs: 정규식 마스킹 및 PR 정규화 로직 주석 추가
+----------------------
 ```
 - pr message 생성
-% python3 main.py pr --convention ./.ai-gitgen.yml                  
-[INFO] Git status 수집 완료: 1개 항목
-M main.py
-[INFO] Git diff 수집 완료: 59줄
+```
+% python3 main.py pr --convention ./.ai-gitgen.yml
+[INFO] Git status 수집 완료: 2개 항목
+M README.md
+ M main.py
+[INFO] Git diff 수집 완료: 88줄
 [INFO] AI API 요청 중... (1회)
 [DONE] 생성 완료
 
 --- PR Draft ---
-Title: feat: add regex comments for secret masking and PR parsing
+Title: Docs: 정규식 마스킹 및 PR 정규화 로직 주석 추가
 
 ## Why
-- 마스킹 및 PR 파싱 정규식의 동작 의도를 코드에서 바로 확인할 수 있도록 설명을 보강했습니다.
-- Markdown 코드 펜스, PR 제목, 섹션 추출 규칙을 유지보수하기 쉽게 정리했습니다.
+- 정규식 마스킹과 PR 텍스트 정규화 로직의 동작 의도를 코드와 문서에서 더 명확히 드러내기 위해서입니다.
+- README 예시의 출력 내용을 현재 동작에 맞게 갱신하기 위해서입니다.
 
 ## What
-- `mask_secrets()`의 각 패턴에 대해 어떤 문자열을 매칭하고 어떤 값을 `[REDACTED]`로 치환하는지 주석을 추가했습니다.
-- `clean_text()`의 코드 펜스 제거 정규식 동작을 설명하는 주석을 추가했습니다.
-- `normalize_pr()`에서 제목 추출과 섹션 추출에 사용되는 정규식의 의미를 주석으로 명시했습니다.
+- `main.py`의 `mask_secrets`, `clean_text`, `normalize_pr`에 정규식 동작과 처리 범위를 설명하는 주석을 추가했습니다.
+- 동적 마스킹 정규식을 사전 컴파일해 문법 오류를 조기에 확인하는 흐름을 주석으로 명시했습니다.
+- `README.md`의 예시 커밋 메시지와 출력 줄 수를 현재 변경 내용에 맞게 수정했습니다.
 
 ## How to Test
-- `python -m py_compile main.py`
-- `python main.py --help`
-- `python -m pytest`  # 프로젝트에 테스트가 구성되어 있다면 실행
-- [ ] 변경 내용을 직접 확인했나요?
-- [ ] 테스트 또는 실행 방법을 확인했나요?
+- `python3 main.py commit --convention ./.ai-gitgen.yml` 실행 후 커밋 메시지 생성이 정상인지 확인합니다.
+- `python3 main.py pr --convention ./.ai-gitgen.yml` 실행 후 PR 제목과 섹션 추출이 정상인지 확인합니다.
+- `python3 -m py_compile main.py`로 문법 오류가 없는지 확인합니다.
 
 ## Checklist
-- [ ] 변경 내용을 직접 확인했나요?
-- [ ] 테스트 또는 실행 방법을 확인했나요?
+- [x] 문서와 코드 주석이 실제 동작과 일치합니다.
+- [x] README 예시가 최신 출력과 맞습니다.
+- [x] 기존 기능 변경 없이 설명만 보강했습니다.
 ----------------------
-
--
+```
+- 실제 PR 링크: https://github.com/hyojun-edu/B3-2/pull/2
+- “AI 초안 → 최종 PR” 변경점 요약
+  1. "README.md의 예시 커밋 메시지와 출력 줄 수를 현재 변경 내용에 맞게 수정했습니다." 라는 내용이 있었는데, 실제 수정은 main.py에만 있었고 README는 수정사항이 없었음. 환각에 의한 내용이므로 삭제.
+  2. 마찬가지로 "-EADME 예시의 출력 내용을 현재 동작에 맞게 갱신하기 위해서입니다." 부분도 README 에서의 출력 내용에 대해서 갱신된 변경사항이 전혀 없었으므로 삭제.
+  3. "동적 마스킹 정규식을 사전 컴파일해 문법 오류를 조기에 확인하는 흐름을 주석으로 명시했습니다."은 이번 변경사항이 정규식이 어떤 동작을 하는지를 설명하는 주석을 다는 것이었으므로 의도에서 벗어난 설명이므로 삭제.
