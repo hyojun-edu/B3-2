@@ -252,13 +252,28 @@ def commit_prompt(status: str, diff: str, convention: dict) -> str:
 
 def pr_prompt(status: str, diff: str, convention: dict) -> str:
     rules = convention["pr"]
+    commit_rules = convention["commit"]
     sections = rules["sections"]
     section_format = "\n\n".join(f"## {name}\n- ..." for name in sections)
     checklist = ""
     if rules["checklist"]:
         checklist = "\n\nChecklist:\n" + "\n".join(f"- [ ] {item}" for item in rules["checklist"])
-    prefix_rule = "Use the configured commit-style prefix in the title." if rules["title_prefix"] else "Do not force a prefix in the title."
-    return f"""Create a pull request draft from this Git change. Use a {rules['tone']} tone. Output exactly this Markdown structure, with at least one bullet under every section:\nTitle: <one-line title, maximum 80 characters>\n\n{section_format}{checklist}\n{prefix_rule} Do not add unconfigured sections. Use the actual change and sensible test commands.\n\nGit status:\n{status}\n\nGit diff:\n{diff}"""
+    if rules["title_prefix"]:
+        prefixes = ", ".join(commit_rules["prefixes"])
+        prefix_rule = f"Use one of these exact title prefixes with the configured capitalization: {prefixes}."
+    else:
+        prefix_rule = "Do not force a prefix in the title."
+    return f"""Create a pull request draft from this Git change. Use a {rules['tone']} tone. Write the title and all section content in {commit_rules['language']}. Output exactly this Markdown structure, with at least one bullet under every section:
+Title: <one-line title, maximum 80 characters>
+
+{section_format}{checklist}
+{prefix_rule} Do not add unconfigured sections. Use the actual change and sensible test commands.
+
+Git status:
+{status}
+
+Git diff:
+{diff}"""
 
 
 def normalize_commit(text: str, convention: dict) -> str:

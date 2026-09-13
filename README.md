@@ -220,3 +220,53 @@ AI 출력은 확률적으로 생성되므로 그대로 실무 산출물로 사�
 ## 오류 처리
 
 API 키 누락, HTTP 인증 오류, 네트워크 오류, 잘못된 API 응답은 원인과 함께 `[ERROR]` 메시지로 출력하고 실패 코드로 종료합니다. API 서버가 다른 주소라면 `--endpoint` 옵션 또는 `OPENAI_API_ENDPOINT` 환경변수로 변경할 수 있습니다.
+
+### 6. 실제 리포지토리에 적용하여 PR 1건 완성하기
+- "의미 있는 변경"을 improve-comment branch에서 수행
+- commit message 생성
+```
+% python3 main.py commit --convention ./.ai-gitgen.yml
+[INFO] Git status 수집 완료: 1개 항목
+M main.py
+[INFO] Git diff 수집 완료: 59줄
+[INFO] AI API 요청 중... (1회)
+[DONE] 생성 완료
+
+--- Commit Message ---
+Docs: 정규식 마스킹 및 텍스트 정규화 주석 추가
+- 비밀값 마스킹 패턴의 동작 설명을 보강함
+- 코드 펜스 제거와 PR 섹션 추출 정규식 주석을 추가함
+```
+- pr message 생성
+% python3 main.py pr --convention ./.ai-gitgen.yml                  
+[INFO] Git status 수집 완료: 1개 항목
+M main.py
+[INFO] Git diff 수집 완료: 59줄
+[INFO] AI API 요청 중... (1회)
+[DONE] 생성 완료
+
+--- PR Draft ---
+Title: feat: add regex comments for secret masking and PR parsing
+
+## Why
+- 마스킹 및 PR 파싱 정규식의 동작 의도를 코드에서 바로 확인할 수 있도록 설명을 보강했습니다.
+- Markdown 코드 펜스, PR 제목, 섹션 추출 규칙을 유지보수하기 쉽게 정리했습니다.
+
+## What
+- `mask_secrets()`의 각 패턴에 대해 어떤 문자열을 매칭하고 어떤 값을 `[REDACTED]`로 치환하는지 주석을 추가했습니다.
+- `clean_text()`의 코드 펜스 제거 정규식 동작을 설명하는 주석을 추가했습니다.
+- `normalize_pr()`에서 제목 추출과 섹션 추출에 사용되는 정규식의 의미를 주석으로 명시했습니다.
+
+## How to Test
+- `python -m py_compile main.py`
+- `python main.py --help`
+- `python -m pytest`  # 프로젝트에 테스트가 구성되어 있다면 실행
+- [ ] 변경 내용을 직접 확인했나요?
+- [ ] 테스트 또는 실행 방법을 확인했나요?
+
+Checklist:
+- [ ] 변경 내용을 직접 확인했나요?
+- [ ] 테스트 또는 실행 방법을 확인했나요?
+----------------------
+
+- 
